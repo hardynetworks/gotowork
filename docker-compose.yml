@@ -1,0 +1,117 @@
+# ============================================
+# Crew Scheduler - Docker Compose Configuration
+# ============================================
+
+version: '3.8'
+
+services:
+  # ==========================================
+  # Main Application Service
+  # ==========================================
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: crew-scheduler-app
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://admin:password123@postgres:5432/crew_scheduler
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:-$(openssl rand -hex 32)}
+      DEBUG: "true"
+    volumes:
+      # Mount code for development (hot reload)
+      - .:/app:cached
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - crew-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ==========================================
+  # PostgreSQL Database
+  # ==========================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: crew-scheduler-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: crew_scheduler
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/pgdata
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    networks:
+      - crew-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d crew_scheduler"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================
+  # Redis Cache
+  # ==========================================
+  redis:
+    image: redis:7-alpine
+    container_name: crew-scheduler-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - crew-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================
+  # Init Script (optional, for first run)
+  # ==========================================
+  init-db:
+    image: postgres:15-alpine
+    container_name: crew-scheduler-init
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: crew_scheduler
+    command: >
+      sh -c "sleep 5 && 
+             pg_isready -U admin && 
+             psql -U admin -d crew_scheduler -f /docker-entrypoint-initdb.d/init.sql"
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+# ==========================================
+# Networks
+# ==========================================
+networks:
+  crew-network:
+    driver: bridge
+
+# ==========================================
+# Volumes
+# ==========================================
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local

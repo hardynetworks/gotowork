@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block title %}Schedules - {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold text-gray-900">📅 Schedules</h1>
+        
+        <button 
+            hx-post="/managers/schedules/"
+            hx-trigger="click"
+            hx-on::after-request="showToast('success', 'Schedule created successfully!')"
+            class="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+            </svg>
+            Generate Schedule
+        </button>
+    </div>
+    
+    <!-- Filters -->
+    <div class="bg-white rounded-xl p-4 shadow-sm">
+        <div class="flex flex-wrap gap-4">
+            <select class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                <option value="">All Statuses</option>
+                <option value="draft">Draft</option>
+                <option value="active">Active</option>
+            </select>
+            
+            <input type="date" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+            
+            <button class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
+                Search...
+            </button>
+        </div>
+    </div>
+    
+    <!-- Schedules Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for schedule in managers.schedules.items %}
+        <div class="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow"
+             hx-get="/schedules/{{ schedule.id }}"
+             hx-target="this"
+             hx-swap="outerHTML">
+            <!-- Status Header -->
+            <div class="p-4 border-b {% if schedule.status == 'active' %}bg-green-50{% else %}bg-gray-50{% endif %}">
+                <div class="flex items-center justify-between">
+                    <span class="px-3 py-1 rounded-full text-xs font-medium 
+                        {% if schedule.status == 'active' %}
+                            bg-green-100 text-green-800
+                        {% elif schedule.status == 'draft' %}
+                            bg-blue-100 text-blue-800
+                        {% else %}
+                            bg-gray-200 text-gray-800
+                        {% endif %}">
+                        {{ schedule.status | capitalize }}
+                    </span>
+                </div>
+            </div>
+            
+            <!-- Period Info -->
+            <div class="p-4">
+                <h3 class="font-semibold text-gray-900 mb-1">
+                    {% if schedule.location_id %}
+                        {{ schedule.location_name }}
+                    {% else %}
+                        All Locations
+                    {% endif %}
+                </h3>
+                <p class="text-sm text-gray-500 mb-4">
+                    {{ schedule.period_start.date() }} to {{ schedule.period_end.date() }}
+                </p>
+                
+                <!-- Stats -->
+                <div class="flex items-center gap-4 mb-4">
+                    <div class="flex-1">
+                        <p class="text-xs text-gray-500">Shifts</p>
+                        <p class="text-lg font-bold text-gray-900">{{ schedule.total_shifts | default(0) }}</p>
+                    </div>
+                    <div class="w-px h-8 bg-gray-200"></div>
+                    <div class="flex-1">
+                        <p class="text-xs text-gray-500">Assignments</p>
+                        <p class="text-lg font-bold text-gray-900">{{ schedule.assignments_count | default(0) }}</p>
+                    </div>
+                </div>
+                
+                <!-- Notes preview -->
+                {% if schedule.notes %}
+                <p class="text-sm text-gray-600 line-clamp-2 mb-4">
+                    {{ schedule.notes }}
+                </p>
+                {% endif %}
+                
+                <a href="/schedules/{{ schedule.id }}" 
+                   class="block w-full text-center px-4 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors">
+                    View Details
+                </a>
+            </div>
+        </div>
+        {% else %}
+        <div class="col-span-full text-center py-12">
+            <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+            </svg>
+            <h3 class="text-lg font-medium text-gray-900 mb-2">No schedules yet</h3>
+            <p class="text-gray-500 mb-4">Generate your first schedule to get started!</p>
+            <button 
+                hx-post="/managers/schedules/"
+                hx-trigger="click"
+                class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                Generate Schedule
+            </button>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Toast Messages -->
+<script>
+function showToast(type, message) {
+    const toast = document.createElement('div');
+    toast.className = `fixed top-4 right-4 px-6 py-4 rounded-lg shadow-lg text-white z-50 transition-all transform translate-x-full max-w-sm`;
+    
+    if (type === 'success') {
+        toast.className += ' bg-green-600';
+    } else if (type === 'error') {
+        toast.className += ' bg-red-600';
+    }
+    
+    toast.innerHTML = `
+        <div class="flex items-start gap-3">
+            <svg class="w-5 h-5 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                ${type === 'success' ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>': '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>'}
+            </svg>
+            <p>${message}</p>
+        </div>
+    `;
+    
+    document.body.appendChild(toast);
+    toast.animate([
+        { transform: 'translateX(100%)' },
+        { transform: 'translateX(0)' }
+    ], { duration: 300 });
+    
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 200);
+    }, 4000);
+}
+</script>
+{% endblock %}
