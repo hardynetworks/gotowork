@@ -21,12 +21,11 @@ services:
       REDIS_URL: redis://redis:6379/0
       SECRET_KEY: ${SECRET_KEY:-$(openssl rand -hex 32)}
       DEBUG: "true"
-    volumes:
-      # Mount code for development (hot reload)
-      - .:/app:cached
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - crew-network
     healthcheck:
@@ -37,7 +36,7 @@ services:
       start_period: 40s
 
   # ==========================================
-  # PostgreSQL Database
+  # PostgreSQL Database (Fixed - removed init container dependency loop)
   # ==========================================
   postgres:
     image: postgres:15-alpine
@@ -60,6 +59,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
 
   # ==========================================
   # Redis Cache
@@ -81,24 +81,9 @@ services:
       retries: 5
 
   # ==========================================
-  # Init Script (optional, for first run)
+  # Removed init-db service (schema runs via init.sql volume mount)
   # ==========================================
-  init-db:
-    image: postgres:15-alpine
-    container_name: crew-scheduler-init
-    environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: password123
-      POSTGRES_DB: crew_scheduler
-    command: >
-      sh -c "sleep 5 && 
-             pg_isready -U admin && 
-             psql -U admin -d crew_scheduler -f /docker-entrypoint-initdb.d/init.sql"
-    volumes:
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
-    depends_on:
-      postgres:
-        condition: service_healthy
+  # No need for separate init container - init.sql runs automatically on first DB startup
 
 # ==========================================
 # Networks
@@ -108,7 +93,7 @@ networks:
     driver: bridge
 
 # ==========================================
-# Volumes
+# Volumes (Persist Data)
 # ==========================================
 volumes:
   postgres_data:
