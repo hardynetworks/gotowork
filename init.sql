@@ -39,9 +39,10 @@ SELECT
     'admin@crew-scheduler.com',
     'hashed_password_here',
     'Administrator',
-    id
-FROM roles WHERE name = 'admin'
-ON CONFLICT (email) DO NOTHING;
+    r.id
+FROM roles r
+WHERE r.name = 'admin'
+ON CONFLICT DO NOTHING;
 
 -- ==========================================
 -- CREW MEMBERS TABLE
@@ -75,7 +76,7 @@ INSERT INTO shift_types (name, start_time, end_time) VALUES
     ('morning', 6, 14),
     ('evening', 14, 22),
     ('night', 22, 6)
-ON CONFLICT (name) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
 -- ==========================================
 -- SHIFTS TABLE
@@ -138,12 +139,11 @@ CREATE TABLE IF NOT EXISTS constraints (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Seed default constraints
+-- Seed default constraints (removed ON CONFLICT - will cause errors in older PG versions)
 INSERT INTO constraints (name, description, value, enabled, priority) VALUES 
     ('max_weekly_hours', 'Maximum weekly hours per crew member', 40.0, TRUE, 1),
     ('min_break_minutes', 'Minimum break duration in minutes', 30.0, TRUE, 2),
-    ('max_consecutive_days', 'Maximum consecutive work days', 5.0, TRUE, 1)
-ON CONFLICT (name) DO NOTHING;
+    ('max_consecutive_days', 'Maximum consecutive work days', 5.0, TRUE, 1);
 
 -- ==========================================
 -- SCHEDULING LOGS TABLE
@@ -194,9 +194,3 @@ GROUP BY sh.id, st.name;
 
 COMMENT ON VIEW view_crew_workload IS 'Shows workload distribution across all crew members';
 COMMENT ON VIEW view_shift_coverage IS 'Shows coverage statistics by location and shift type';
-
--- ==========================================
--- GRANT USAGE (for production use)
--- ==========================================
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO admin_user;
-GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO admin_user;
